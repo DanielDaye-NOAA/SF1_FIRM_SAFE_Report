@@ -4,6 +4,7 @@ require(tidyverse)
 
 source("./functions/TransposeTable.R")
 
+
 # Load Data Files ----
 path = paste0("./data/",report_year-1,"/processed_datasets/SAFE_",report_year-1,"_data_")
 ## NEFOP ----
@@ -16,6 +17,7 @@ UDP_logbook <- read_xlsx(paste0(path,"UDP_logbook.xlsx"), guess_max = 1e7)
 gc()
 
 report_years = (report_year-5):(report_year-1)
+eval(report_year-1)
 
 
 # Table 5.20 [UDP-C] ----
@@ -87,9 +89,8 @@ tab_5.22 <- UDP_logbook %>%
 tab_5.22
 
 
-# Table 5.28 ----
-# Reported buoy gear effort [UDP]
-
+# Table 5.28 [UDP] ----
+# Reported buoy gear effort
 tab_5.28 <- UDP_logbook %>%
   filter(YEAR %in% report_years, BUOY == "Y") %>%
   group_by(YEAR) %>%
@@ -102,13 +103,11 @@ tab_5.28 <- UDP_logbook %>%
   TransposeTable()
 tab_5.28
 
-```
 
-### Table 5.31
-Reported buoy gear landings by weight (lb dw), 2018-2022
-```{r tab5.31}
-data %>%
-  filter(YEAR %in% years & BUOY =="Y") %>%
+# Table 5.31 [UDP] ----
+# Reported buoy gear landings by weight (lb dw), 2018-2022
+tab_5.31 <- UDP_logbook %>%
+  filter(YEAR %in% report_years & BUOY =="Y") %>%
   group_by(YEAR) %>%
   summarise(LBSWO = sum(SWOLB, na.rm = T),
             LBDOL = sum(DOLPHIN_POUNDS, na.rm = T),
@@ -120,47 +119,50 @@ data %>%
             LBBON = sum(BONLB, na.rm = T),
             LBBLK = sum(BLKLB, na.rm = T)) %>%
   TransposeTable()
-```
+tab_5.31
 
-### Table 5.45
-Gillnet gear effort in US NE and MAR, targeting smooth dogfish, 2022
-Source File: 2022_smooth_dogfish_trips.xlsx
-```{r tab5.45}
-smd_ggear_effort <- safe_sDog_trips %>%
+
+# Table 5.45 [NEFOP] ----
+#' Gillnet gear effort in US NE and MAR, targeting smooth dogfish
+#' sourced from NEFOP smoothdog trips
+tab_5.45_data <- NEFOP_sdog_trips %>%
   group_by(TRIPID) %>%
   summarize(NUM_ROWS = n(),
             NUM_SETS = length(unique(HAULNUM)),
             UID_SETS = paste(unique(HAULNUM), collapse =":"))
-kbl(smd_ggear_effort) %>%
-  kable_styling() %>%
-  scroll_box(height = "400px")
+tab_5.45_data
 
-data.frame(NUM_TRIPS = nrow(smd_ggear_effort),  #  34 Trips
-           NUM_SETS = sum(smd_ggear_effort$NUM_SETS))  # 110 Sets
-```
+tab_5.45 <- data.frame(x = c("NUM_TRIPS", "NUM_SETS"),
+                       y = c(nrow(tab_5.45), sum(tab_5.45$NUM_SETS)))
+names(tab_5.45) = c("Specification", report_year-1)
+tab_5.45
 
-### Table 5.46
-Catch and landings of smooth dogfish using gillnet gear
-Source File: 2022_smooth_dogfish_trips.xlsx
-```{r tab5.46}
-smd_catch_landings <- safe_sDog_trips %>%
+
+# Table 5.46 [NEFOP] ----
+#' Catch and landings of smooth dogfish using gillnet gear
+#' sourced from NEFOP smoothdog trips
+tab_5.46_data <- NEFOP_sdog_trips %>%
   group_by(DISPDESC) %>%
   filter(COMNAME == "DOGFISH, SMOOTH") %>%
   summarize(tot = sum(HAILWT))
+tab_5.46_data
 
-smd_catch_landings  # 73,091 KEPT; 144 DISC
+tab_5.46 <- data.frame(Tot.Caught = sum(tab_5.46_data$tot),
+                       Num.Kept = tab_5.46_data$tot[2],
+                       Pct.Kept = round(tab_5.46_data$tot[2]*100/sum(tab_5.46_data$tot),1),
+                       Num.Disc = tab_5.46_data$tot[1],
+                       Pct.Disc = round(tab_5.46_data$tot[1]*100/sum(tab_5.46_data$tot),1)) %>%
+  TransposeTable(colToRowName = FALSE)
+names(tab_5.46) = report_year-1
+tab_5.46
 
-data.frame(Tot.Caught = sum(smd_catch_landings$tot),
-           Num.Kept = smd_catch_landings$tot[2],
-           Pct.Kept = round(smd_catch_landings$tot[2]*100/sum(smd_catch_landings$tot),1),
-           Num.Disc = smd_catch_landings$tot[1],
-           Pct.Disc = round(smd_catch_landings$tot[1]*100/sum(smd_catch_landings$tot),1))
-```
 
-### Table 5.48
-Atl. HMS caught/kept on NEFOP BLL trips targeting FINFISH (Tilefish+)
-```{r tab5.48, message=F}
-safe_HMS %>%
+# Table 5.48 [NEFOP]* ----
+#' Atl. HMS caught/kept on NEFOP BLL trips targeting FINFISH (Tilefish+)
+#' Sourced from NEFOP HMS
+#' This will probably need updating to catch other finfish species as these choices 
+#' were specific to 2022 data
+tab_5.48 <- NEFOP_HMS %>%
   filter(HMSGEARCAT == "BOTTOM LONGLINE",
          grepl("TILEFISH|HADDOCK", TARG1_COMMONNAME)) %>%
   group_by(COMNAME, DISPDESC) %>%
@@ -171,14 +173,15 @@ safe_HMS %>%
             KEPT, KEPT.PCT = round(KEPT*100/TOT_CAUGHT, digits = 1),
             DISC, DISC.PCT = round(DISC*100/TOT_CAUGHT, digits = 1)) %>%
   arrange(desc(TOT_CAUGHT))
-```
+tab_5.48
 
-### Table 5.49
-Non-target SHARK caught/kept on NEFOP gillnet trips targeting TELEOSTS
-```{r tab5.49, message=F}
-tab <- safe_HMS %>%
-  filter(grepl("GILLNET", HMSGEARCAT),
-         grepl("SHARK|TUNA", COMNAME),
+
+# Table 5.49 [NEFOP]* ----
+#' Non-target SHARK caught/kept on NEFOP gillnet trips targeting TELEOSTS
+#' Sourced from NEFOP_HMS
+#' Likely need to update filter here to dynamically catch the correct species
+tab_5.49 <- NEFOP_HMS %>%
+  filter(grepl("GILLNET", HMSGEARCAT), grepl("SHARK|TUNA", COMNAME),
          !grepl("ATLANTIC SHARPNOSE|DOGFISH|SKATE", TARG1_COMMONNAME)) %>%# select(TARG1_COMMONNAME) %>% table()
   group_by(COMNAME, DISPDESC) %>%
   summarise(NUM = n()) %>%
@@ -187,20 +190,13 @@ tab <- safe_HMS %>%
   transmute(TOT = KEPT + DISC,
             KEPT, KEPT.PCT = round(KEPT*100/TOT, digits = 1),
             DISC, DISC.PCT = round(DISC*100/TOT, digits = 1)) %>%
-  arrange(desc(TOT)) %>% print(n = 50)
-kbl(tab) %>%
-  kable_styling() %>%
-  scroll_box(height = "450px")
-```
+  arrange(desc(TOT))
+tab_5.49
 
 
-
-```
-## Text
-### 5.3.6.2
-Which species dominated the NEFOP smooth dogfish gillnet fishery
-```{r text01, message=F}
-tab <- safe_sDog_trips %>%
+# Text 5.3.6.2 [NEFOP] ----
+# Which species dominated the NEFOP smooth dogfish gillnet fishery?
+text_5.3.6.2_1 <- NEFOP_sdog_trips %>%
   group_by(COMNAME, DISPDESC) %>%
   summarise(TOT_WGT = sum(HAILWT, na.rm = T)) %>%
   spread(DISPDESC, TOT_WGT) %>%
@@ -208,45 +204,36 @@ tab <- safe_sDog_trips %>%
   mutate(TOT_HAILWGT = DISC + KEPT + `<NA>`)%>%
   transmute(TOT_HAILWGT, KEPT, DISC) %>%
   arrange(desc(TOT_HAILWGT))
-kbl(tab) %>%
-  kable_styling() %>%
-  scroll_box(height = "450px")
-```
+text_5.3.6.2_1
 
-Total VESSELS / SETS / TRIPS targeting smooth dogfish
-```{r text02}
-tab <- safe_sDog_trips %>% 
+# Total VESSELS / SETS / TRIPS targeting smooth dogfish
+text_5.3.6.2_2 <- NEFOP_sdog_trips %>% 
   group_by(HULLNUM1) %>%
   summarise(VESNAME = paste0(unique(VESSELNAME),sep="",collapse = ":"),
             N_TRIP = length(unique(TRIPID)),
             N_SETS = length(unique(paste(TRIPID, HAULNUM)))) %>%
   arrange(desc(HULLNUM1))
-kbl(tab) %>%
-  kable_styling() %>%
-  scroll_box(fixed_thead = TRUE)
-```
+# text_5.3.6.2_2
+# Summary text
+paste(nrow(text_5.3.6.2_2),"vessels made",sum(text_5.3.6.2_2$N_SETS),"sets targeting smoothdog across",sum(text_5.3.6.2_2$N_TRIP),"trips.")
 
-Number of Trips where Smooth dogfish were recorded caught
-```{r text03}
-sDog_tripCatches <- safe_sDog_trips %>% 
+# NUM Trips where Smooth dogfish were recorded caught
+text_5.3.6.2_3 <- NEFOP_sdog_trips %>% 
   filter(COMNAME == "DOGFISH, SMOOTH") %>%
   group_by(TRIPID) %>%
   summarize(NSETS = length(unique(HAULNUM)),
             UID_SETS = paste(unique(HAULNUM), collapse =":"),
             UID_CATCH = paste(unique(COMNAME), collapse = ":")) %>%
   arrange(TRIPID)
+# text_5.3.6.2_3
+paste(sum(text_5.3.6.2_3$NSETS),"sets across",nrow(text_5.3.6.2_3),"trips recorded catching smoothdogs.")
 
-kbl(sDog_tripCatches) %>%
-  kable_styling() %>%
-  scroll_box(height = "400px", fixed_thead = TRUE)
 
-sum(sDog_tripCatches$NSETS)
-```
-
-### 5.4.1
-Total SETS and TRIPS targeting TILEFISH in BLL
-```{r text04}
-safe_HMS %>%
+# Text 5.4.1 [NEFOP]* ----
+# Total SETS and TRIPS targeting TILEFISH in BLL
+# Not sure why there's two different workflows here; need to refer back to the text
+# (might be two separate areas discussing filefish)
+text_5.4.1_1 <- NEFOP_HMS %>%
   filter(HMSGEARCAT == "BOTTOM LONGLINE",
          grepl("TILEFISH|HADDOCK", TARG1_COMMONNAME)) %>%
   group_by(TRIPID) %>%
@@ -254,7 +241,9 @@ safe_HMS %>%
             VESS = unique(VESSELNAME),
             NUM_SETS = length(unique(HAULNUM)),
             UID_SETS = paste(unique(HAULNUM), collapse =":"))
-safe_HMS %>%
+text_5.4.1_1
+
+text_5.4.1_2 <- NEFOP_HMS %>%
   filter(HMSGEARCAT == "BOTTOM LONGLINE",
          grepl("TILEFISH, GOLDEN", TARG1_COMMONNAME)) %>%
   group_by(TRIPID) %>%
@@ -262,44 +251,36 @@ safe_HMS %>%
             VESS = unique(VESSELNAME),
             NUM_SETS = length(unique(HAULNUM)),
             UID_SETS = paste(unique(HAULNUM), collapse =":"))
-```
+text_5.4.1_2
 
-### 5.4.2
-NUM TRIPS, SETS, VESSELS observed interacting with HMS in gillnet fishery
-```{r text05}
-safe_HMS %>% filter(grepl("GILLNET", HMSGEARCAT)) %>% nrow()
-safe_HMS %>%
+# Text 5.4.2 [NEFOP] ----
+# NUM TRIPS, SETS, VESSELS observed interacting with HMS in gillnet fishery
+NEFOP_HMS %>% filter(grepl("GILLNET", HMSGEARCAT)) %>% nrow()
+NEFOP_HMS %>%
   filter(grepl("GILLNET", HMSGEARCAT)) %>%
-  select(HULLNUM1, VESSELNAME, TRIPID, HAULNUM, TARG1_COMMONNAME, COMNAME) %>%
-  kbl %>%
-  kable_styling %>%
-  scroll_box(height = "450px")
-```
+  select(HULLNUM1, VESSELNAME, TRIPID, HAULNUM, TARG1_COMMONNAME, COMNAME)
 
-#### 5.4.2.1 
-NUM SETS and VESSELS  interacting with HMS on gillnets
-```{r text06, message=F}
-# Discrepancy between me and heather regarding removing prohibited species from the data if 
-# occurring in the "COMMONNAME" column. since COMNAME corresponds to the name of the bycatch
-tab <- safe_HMS %>%
+
+## 5.4.2.1* ----
+# NUM SETS and VESSELS  interacting with HMS on gillnets
+# Revisit to clarify what's going on here
+#' Discrepancy between me and Heather occurred with regard to removing prohibited 
+#' species from the data if they appeared in the "COMMONNAME" column. COMNAME corresponds 
+#' to the name of the bycatch
+text_5.4.2.1 <- NEFOP_HMS %>%
   filter(grepl("GILLNET", HMSGEARCAT),
-         #grepl("SHARK|TUNA", COMNAME),
-         !grepl("ATLANTIC SHARPNOSE|DOGFISH|SKATE", TARG1_COMMONNAME)) %>%  # select(TARG1_COMMONNAME) %>% table()
+         !grepl("ATLANTIC SHARPNOSE|DOGFISH|SKATE", TARG1_COMMONNAME)) %>%
   group_by(HULLNUM1) %>%
   mutate(TRIPHAUL = paste(TRIPID, HAULNUM)) %>%
   summarise(n.trip = length(unique(TRIPID)),
             n.haul = length(unique(HAULNUM)),
             n.sets = length(unique(TRIPHAUL)))
+text_5.4.2.1
+data.frame(N_VESS = nrow(text_5.4.2.1),
+           N_TRIP = sum(text_5.4.2.1$n.trip),
+           N_SETS = sum(text_5.4.2.1$n.sets))
 
-tab %>% kbl() %>%
-  kable_styling() %>%
-  scroll_box(fixed_thead = TRUE, height = "450px")
-
-data.frame(N_VESS = length(unique(tab$HULLNUM1)),
-           N_TRIP = sum(tab$n.trip),
-           N_SETS = sum(tab$n.sets))
-
-safe_HMS %>%
+NEFOP_HMS %>%
   filter(grepl("GILLNET", HMSGEARCAT),
          #grepl("SHARK|TUNA", COMNAME),
          !grepl("ATLANTIC SHARPNOSE|DOGFISH|SKATE", TARG1_COMMONNAME)) %>%  # select(TARG1_COMMONNAME) %>% table()
@@ -307,8 +288,8 @@ safe_HMS %>%
   summarise(num = n()) %>%
   arrange(desc(num))
 
-# Drift Gillnet sets
-drift <- safe_HMS %>%
+### Drift Gillnet sets ----
+drift_5.4.2.1 <- NEFOP_HMS %>%
   filter(grepl("DRIFT GILLNET", HMSGEARCAT),
          grepl("SHARK|TUNA", COMNAME),
          !grepl("ATLANTIC SHARPNOSE|DOGFISH|SKATE", TARG1_COMMONNAME)) %>% # select(HMSGEARCAT) %>% table()
@@ -317,13 +298,13 @@ drift <- safe_HMS %>%
   summarise(n.trip = length(unique(TRIPID)),
             n.haul = length(unique(HAULNUM)),
             n.sets = length(unique(TRIPHAUL)))
-drift %>% print(n = nrow(tab))
-data.frame(N_VESS = length(unique(drift$HULLNUM1)),
-           N_SETS = sum(drift$n.sets),
-           N_TRIP = sum(drift$n.trip))
+drift_5.4.2.1 %>% print(n = nrow(drift_5.4.2.1))
+data.frame(N_VESS = nrow(drift_5.4.2.1),
+           N_SETS = sum(drift_5.4.2.1$n.sets),
+           N_TRIP = sum(drift_5.4.2.1$n.trip))
 
-# Sink Gillnet sets
-sink <- safe_HMS %>%
+### Sink Gillnet sets ----
+sink_5.4.2.1 <- NEFOP_HMS %>%
   filter(grepl("SINK GILLNET", HMSGEARCAT),
          grepl("SHARK|TUNA", COMNAME),
          !grepl("ATLANTIC SHARPNOSE|DOGFISH|SKATE", TARG1_COMMONNAME)) %>% # select(HMSGEARCAT) %>% table()
@@ -332,37 +313,33 @@ sink <- safe_HMS %>%
   summarise(n.trip = length(unique(TRIPID)),
             n.haul = length(unique(HAULNUM)),
             n.sets = length(unique(TRIPHAUL)))
-sink %>% print(n = nrow(tab)) 
-data.frame(N_VESS = length(unique(sink$HULLNUM1)),
-           N_SETS = sum(sink$n.sets),
-           N_TRIP = sum(sink$n.trip))
-```
+sink_5.4.2.1 %>% print(n = nrow(sink_5.4.2.1)) 
+data.frame(N_VESS = nrow(sink_5.4.2.1),
+           N_SETS = sum(sink_5.4.2.1$n.sets),
+           N_TRIP = sum(sink_5.4.2.1$n.trip))
 
-### 5.4.3
-HMS encounters and retention in TRAWLS
-```{r text07}
-safe_HMS %>%
-  filter(grepl("TRAWL", HMSGEARCAT)) %>% #select(TARG1_COMMONNAME) %>%table()
+
+# Text 5.4.3 [NEFOP]* ----
+# Revisit to clarify
+# HMS encounters and retention in TRAWLS
+NEFOP_HMS %>%
+  filter(grepl("TRAWL", HMSGEARCAT)) %>%
   group_by(TARG1_COMMONNAME) %>%
-  summarize(n = n()) %>% arrange(desc(n)) %>%
-  kbl() %>%
-  kable_styling() %>% 
-  scroll_box(height = "450px")
+  summarize(n = n()) %>% 
+  arrange(desc(n))
 
-safe_HMS %>%
-  filter(grepl("TRAWL", HMSGEARCAT)) %>% #select(TARG1_COMMONNAME) %>%table()
+NEFOP_HMS %>%
+  filter(grepl("TRAWL", HMSGEARCAT)) %>%
   group_by(COMNAME) %>%
-  summarize(n = n()) %>% arrange(desc(n)) %>%
-  kbl() %>%
-  kable_styling() %>% 
-  scroll_box(height = "450px")
+  summarize(n = n()) %>% 
+  arrange(desc(n))
 
-safe_HMS %>%
-  filter(grepl("TRAWL", HMSGEARCAT),
+
+NEFOP_HMS %>%
+  filter(grepl("TRAWL", HMSGEARCAT), 
          grepl("SWO|TUNA|SHARK", COMNAME),
-         DISPDESC == "KEPT") %>% #select(TARG1_COMMONNAME) %>%table()
-  group_by(TARG1_COMMONNAME) %>% #View()
+         DISPDESC == "KEPT") %>%
+  group_by(TARG1_COMMONNAME) %>%
   summarize(num = n(),
-            spec = paste0(unique(COMNAME), collapse = ":")) %>% arrange(desc(num)) %>%
-  kbl() %>%
-  kable_styling()
+            spec = paste0(sort(unique(COMNAME)), collapse = ":"),
+            spec = gsub(" ","",spec)) %>% arrange(desc(num))

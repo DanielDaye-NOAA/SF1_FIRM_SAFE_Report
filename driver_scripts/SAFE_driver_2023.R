@@ -9,3 +9,9 @@ report_year = 2023
 # First, data files are loaded into R and cleaned up
 # file.edit("./functions/WrangleSAFEData.R")
 WrangleSAFEData(report_year = report_year)
+
+
+# Compile all Chapter 5 data
+  # Generate xlsx workbooks and .html
+# Compile all Chapter 6 data
+  # Generate xlsx workbooks and .html

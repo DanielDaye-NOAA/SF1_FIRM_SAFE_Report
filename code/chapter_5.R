@@ -14,10 +14,8 @@ NEFOP_sdog_length <- read_xlsx(paste0(path,"NEFOP_smoothdog_length.xlsx"))
 ## UDP ----
 UDP_logbook <- read_xlsx(paste0(path,"UDP_logbook.xlsx"), guess_max = 1e7)
 
-gc()
-
 report_years = (report_year-5):(report_year-1)
-eval(report_year-1)
+gc()
 
 
 # Table 5.20 [UDP-C] ----
@@ -252,6 +250,7 @@ text_5.4.1_2 <- NEFOP_HMS %>%
             NUM_SETS = length(unique(HAULNUM)),
             UID_SETS = paste(unique(HAULNUM), collapse =":"))
 text_5.4.1_2
+
 
 # Text 5.4.2 [NEFOP] ----
 # NUM TRIPS, SETS, VESSELS observed interacting with HMS in gillnet fishery

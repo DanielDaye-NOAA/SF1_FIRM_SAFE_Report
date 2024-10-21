@@ -1,10 +1,31 @@
-## Chapter 6:
-### Table 6.11
-SWO, BFT, YFDT, BET, BAYS landings and discards in PLL
-```{r tab6.11}
-tab_6.11 <- data %>%
-  filter(SYEAR %in% years & PLL == "Y") %>%
-  group_by(SYEAR) %>%
+# Chapter 6 SAFE Report Updates:
+require(ggtext)
+require(readxl)
+require(terra)
+require(tidyterra)
+require(tidyverse)
+
+source("./functions/TransposeTable.R")
+
+# Load Data Files ----
+path = paste0("./data/",report_year-1,"/processed_datasets/SAFE_",report_year-1,"_data_")
+## NEFOP ----
+NEFOP_HMS <- read_xlsx(paste0(path,"NEFOP_HMS.xlsx"))
+NEFOP_sdog_trips <- read_xlsx(paste0(path,"NEFOP_smoothdog_trips.xlsx"))
+NEFOP_sdog_length <- read_xlsx(paste0(path,"NEFOP_smoothdog_length.xlsx"))
+## UDP ----
+UDP_logbook <- read_xlsx(paste0(path,"UDP_logbook.xlsx"), guess_max = 1e7)
+
+gc()
+
+report_years = (report_year-5):(report_year-1)
+
+
+# Table 6.11 [UDP] ----
+# SWO, BFT, YFDT, BET, BAYS landings and discards in PLL
+tab_6.11 <- UDP_logbook %>%
+  filter(YEAR %in% report_years & PLL == "Y") %>%
+  group_by(YEAR) %>%
   summarize(NUM_HOOK = round(sum(HOOKS, na.rm = T)/1000,digits = 2),
             SWO_kept = sum(SWOK, na.rm = T),
             SWO_disc = sum(c(SWOD, SWOA), na.rm = T),
@@ -41,18 +62,16 @@ tab_6.11 <- tab_6.11 %>%
   mutate_if(is.numeric, as.character) %>% 
   t() %>% 
   data.frame()
+tab_6.11
 
-kbl(tab_6.11) %>%
-  kable_minimal()
-```
 
-### Table 6.12
-SHARK, DOL, WAH, BILLFISH, TURTLE landings and discards in Atlantic PLL with % Change
-```{r tab6.12}
-tab <- data %>%
-  filter(SYEAR %in% years,
+# Table 6.12 [UDP]* ----
+# SHARK, DOL, WAH, BILLFISH, TURTLE landings and discards in Atlantic PLL with % Change
+# This will need to be updated to work with different report_years
+tab_6.12 <- UDP_logbook %>%
+  filter(YEAR %in% report_years,
          PLL == "Y") %>%
-  group_by(SYEAR) %>%
+  group_by(YEAR) %>%
   summarise(PSHK_kept = sum(c(BSHK, XTHK, OCSK, PORK, SMAK), na.rm = T),  # Pelagic Sharks kept
             PSHK_disc = sum(c(BSHD, BSHA, XTHD, XTHA, OCSD, OCSA,         # Pelagic Sharks disc
                               PORD, PORA, SMAD, SMAA), na.rm = T),
@@ -78,23 +97,23 @@ tab <- data %>%
          dif_b = round((ref_B-y9799)*100/y9799, digits = 1)) %>%
   select(y9799,ref_A,`2018`,`2019`,`2020`,`2021`,`2022`,ref_B,dif_a, dif_b) %>%
   TransposeTable(colToRowName = F)
-kbl(tab) %>%
-  kable_minimal()
-```
+tab_6.12
 
-### Table 6.13
-Distribution of HOOKS set by REGION 2018-2022, % Change since 1997-1999 in ATL PLL
-```{r tab6.13, message=F}
-tab_6.13 <- data %>%
-  filter(SYEAR %in% years & PLL == "Y") %>%
-  group_by(REGION, SYEAR) %>%
+
+# Table 6.13 [UDP]* ----
+# Distribution of HOOKS set by REGION 2018-2022, 
+# Include % Change since 1997-1999 in ATL PLL
+# Needs updating to work with other report_years, streamline code
+tab_6.13 <- UDP_logbook %>%
+  filter(YEAR %in% report_years & PLL == "Y") %>%
+  group_by(REGION, YEAR) %>%
   summarize(TOT_HOOKS = sum(HOOKS, na.rm = T)) %>%
   spread(REGION, TOT_HOOKS) %>%
   replace(is.na(.), 0) %>%
   mutate(TUN_TUS = TUN + TUS,
          TOTAL = CAR + GOM + FEC + SAB + MAB + NEC + NED + SAR + NCA + TUN_TUS) %>%
-  select(SYEAR, CAR, GOM, FEC, SAB, MAB, NEC, NED, SAR, NCA, TUN_TUS, TOTAL) %>%
-  column_to_rownames("SYEAR") %>%  
+  select(YEAR, CAR, GOM, FEC, SAB, MAB, NEC, NED, SAR, NCA, TUN_TUS, TOTAL) %>%
+  column_to_rownames("YEAR") %>%  
   t() %>% data.frame()
 
 # Still not a perfect solution as the column names have an X at the start, will remove
@@ -113,19 +132,16 @@ tab_6.13 <- tab_6.13 %>%
   mutate_if(is.numeric, as.character) %>% 
   t() %>% 
   data.frame() 
+tab_6.13
 
-kbl(tab_6.13) %>%
-  kable_minimal()
-```
 
-### Table 6.14
-BFT, SWO, Pelagic & Large Coastal Sharks, BILLFISH, TURTLES KEPT/DISC in MAB & NEC
-```{r tab6.14}
-tab <- data %>%
+# Table 6.14 [UDP] ----
+# BFT, SWO, Pelagic & Large Coastal Sharks, BILLFISH, TURTLES KEPT/DISC in MAB & NEC
+tab_6.14 <- UDP_logbook %>%
   filter(REGION %in% c("MAB", "NEC"),
          PLL == "Y", 
-         SYEAR %in% years) %>%  #dim() # 9,148 x 323
-  group_by(SYEAR) %>%
+         YEAR %in% report_years) %>%
+  group_by(YEAR) %>%
   summarise(TOT_HOOK = sum(HOOKS, na.rm = T),
             THO_HOOK = round(TOT_HOOK/1000, digits = 6),
             BFT_K = sum(BFTK, na.rm = T),
@@ -141,21 +157,19 @@ tab <- data %>%
                               SSPD, SSPA, TIGD, TIGA, GHHD, GHHA, SBUD, SBUA), na.rm = T),
             BFSH_D = sum(c(BUMD, BUMA, WHMD, WHMA, SAID, SAIA, SPXD, SPXA), na.rm = T),
             TURT_I = sum(c(TLB, TTL, TTG, KRT, THB, TTX), na.rm = T))
-kbl(tab, align = "l") %>%
-  kable_minimal()
-```
+tab_6.14
 
-### Table 6.15
-BFT, SWO, Pelagic & Large Coastal Sharks, BILLFISH, TURTLES KEPT/DISC in all regions except 
-NEC and MAB
-```{r tab6.15}
-tab <- data %>%
+
+# Table 6.15 [UDP] ----
+#' BFT, SWO, Pelagic & Large Coastal Sharks, BILLFISH, TURTLES KEPT/DISC in 
+#' all regions except NEC and MAB
+tab_6.15 <- UDP_logbook %>%
   filter(!REGION %in% c("MAB", "NEC"),
          PLL == "Y", 
-         SYEAR %in% years) %>%  #dim() # 9,148 x 323 
-  group_by(SYEAR) %>%
+         YEAR %in% report_years) %>%  #dim() # 9,148 x 323 
+  group_by(YEAR) %>%
   summarise(TOT_HOOK = sum(HOOKS, na.rm = T),
-            THO_HOOK = round(TOT_HOOK/1000, digits = 6),
+            THOUSAND_HOOK = round(TOT_HOOK/1000, digits = 6),
             BFT_K = sum(BFTK, na.rm = T),
             BFT_D = sum(c(BFTD, BFTA), na.rm = T),
             SWO_K = sum(SWOK, na.rm = T),
@@ -169,14 +183,12 @@ tab <- data %>%
                               SSPD, SSPA, TIGD, TIGA, GHHD, GHHA, SBUD, SBUA), na.rm = T),
             BFSH_D = sum(c(BUMD, BUMA, WHMD, WHMA, SAID, SAIA, SPXD, SPXA), na.rm = T),
             TURT_I = sum(c(TLB, TTL, TTG, KRT, THB, TTX), na.rm = T))
-kbl(tab) %>%
-  kable_minimal()
-```
+tab_6.15
 
-### Table 6.25
-Observed Protected Species Interactions in NE and Mid ATL Gillnet Fishery
-```{r tab6.25, message=F}
-safe_sDog_trips %>%
+
+# Table 6.25 [NEFOP] ----
+# Observed Protected Species Interactions in NE and Mid ATL Gillnet Fishery
+tab_6.25 <- NEFOP_sdog_trips %>%
   group_by(COMNAME, DISPDESC) %>%
   summarise(NUM_INT = n()) %>%
   spread(DISPDESC, NUM_INT) %>%
@@ -184,12 +196,12 @@ safe_sDog_trips %>%
          !(grepl("RAY|EGGS|BASS|SEA ROBIN|CRAB|BLUEFISH|JELLYFISH", COMNAME)),
          !(grepl("BONITO|COBIA|LOBSTER|MENHADEN|SCUP|MONKFISH", COMNAME)),
          !(grepl("STARGAZER|STARFISH|WEAKFISH|SHELL|TAUTOG|TUNA", COMNAME)))
-```
+tab_6.25
 
-### Table 6.28
-Total Otter TRAWL shark catches from non-smooth dogfish targeted sets
-```{r tab6.28, message=F}
-otter_sharks <- safe_HMS %>%
+
+# Table 6.28 [NEFOP] ----
+# Total Otter TRAWL shark catches from non-smooth dogfish targeted sets
+tab_6.28 <- NEFOP_HMS %>%
   filter(HMSGEARCAT == "TRAWL" & SMOOTHDOGTRIP == FALSE) %>%
   filter(grepl("SHARK", COMNAME)) %>%
   group_by(COMNAME, STATUS, DISPDESC) %>%
@@ -201,16 +213,14 @@ otter_sharks <- safe_HMS %>%
             NA_DISC, pNA_DISC = round(NA_DISC*100/TOT, 1),
             DEAD_KEPT) %>%
   arrange(desc(TOT))
-kbl(otter_sharks) %>%
-  kable_styling() %>%
-  scroll_box(height = "450px")
-sum(otter_sharks$TOT)
-```
+tab_6.28
+paste0(sum(tab_6.28$TOT)," sharks caught from all non-smoothdog targeted otter trawls.")
 
-### Table 6.30
-Prohibited Shark HMS spp Caught/Disc on BLL trips targeting FINFISH
-```{r tab6.30, message=F}
-safe_HMS %>% 
+
+# Table 6.30 [NEFOP] ----
+# Prohibited Shark HMS spp Caught/Disc on BLL trips targeting FINFISH
+
+tab_6.30 <- NEFOP_HMS %>% 
   filter(HMSGEARCAT == "BOTTOM LONGLINE") %>% # select(TARG1_COMMONNAME) %>% table()
   filter(grepl("TILEFISH|HADDOCK", TARG1_COMMONNAME)) %>% # select(HULLNUM1, VESSELNAME, TARG1_COMMONNAME)
   group_by(COMNAME, DISPDESC) %>%
@@ -218,13 +228,13 @@ safe_HMS %>%
   spread(DISPDESC, TOT) %>%
   transmute(TOT = sum(DISC, KEPT, na.rm = T), KEPT, DISC) %>%
   arrange(desc(TOT))
-```
+tab_6.30
 
-### Table 6.31
-Sharks caught/disc on trips across all gillnet gear types targeting mixed TELEOSTS
-```{r tab6.31, message=F}
+
+# Table 6.31 [NEFOP] ----
+# Sharks caught / discarded on trips using gillnet gear types targeting mixed TELEOSTS
 # TELEOSTS = removing SHARK, DOGFISH, SKATE from TARG1
-sharks <- safe_HMS %>%
+tab_6.31 <- NEFOP_HMS %>%
   filter(grepl("GILLNET", HMSGEARCAT),
          !grepl("SHARK|DOGFISH|SKATE", TARG1_COMMONNAME),
          !grepl("ANGEL|BASKING|DUSKY|NIGHT|GREENLAND|SAND TIGER|SHARK, WHITE", COMNAME),
@@ -236,17 +246,14 @@ sharks <- safe_HMS %>%
   replace(is.na(.), 0) %>%
   mutate(TOTAL = DISC + KEPT,
          PCT.DISC = round(DISC*100/TOTAL, digits = 1)) %>%
-  select(TOTAL, PCT.DISC) %>%
-  print(n = 50)
-kbl(sharks) %>%
-  kable_styling()
-sum(sharks$TOTAL)
+  select(TOTAL, PCT.DISC) 
+tab_6.31
+paste0(sum(tab_6.31$TOTAL)," sharks caught/discarded across all GILLNET trips targeting mixed TELEOSTS")
 
-### 6.5.1
-Mixed-species Otter Trawl TRIP and SET counts
-```{r text08, message=F}
+# Text 6.5.1 [NEFOP] ----
+# Mixed-species Otter Trawl TRIP and SET counts
 # THIS IS NOW CORRECT AND IN-LINE WITH HEATHER'S MATH
-otter_vess <- safe_HMS %>%
+text_6.5.1 <- NEFOP_HMS %>%
   filter(HMSGEARCAT == "TRAWL") %>% #select(GEARNM) %>% table()# all TRAWL in this data are OTTER TRAWL  #select(TARG1_COMMONNAME) %>% table()
   filter(!grepl("ANGEL|BASKING|DUSKY|NIGHT|GREENLAND|SAND TIGER|SHARK, WHITE", COMNAME)) %>% #select(COMNAME) %>% table()
   group_by(HULLNUM1, TRIPID) %>%
@@ -255,40 +262,33 @@ otter_vess <- safe_HMS %>%
             N_SET = length(unique(paste(TRIPID, HAULNUM))),
             TARG = paste(unique(TARG1_COMMONNAME), collapse = ";"))
 
-data.frame(NUM_VESS = length(unique(otter_vess$HULLNUM1)),  # 105 unique vessel
-           NUM_TRIPS = length(unique(otter_vess$TRIPID)),   # 215 trips
-           NUM_SETS = sum(otter_vess$N_SET)) %>%            # 412 sets
-  print()
-```
+tab_6.5.1 <- data.frame(NUM_VESS = length(unique(text_6.5.1$HULLNUM1)),
+                        NUM_TRIPS = length(unique(text_6.5.1$TRIPID)),
+                        NUM_SETS = sum(text_6.5.1$N_SET))
+tab_6.5.1
 
-### 6.5.4.1
-Text updates in paragraphs
-```{r text09}
+
+# Text 6.5.4.1 [NEFOP]* ----
+# Add info for what exactly is being pulled in each of these (probably top species in X)
 # first paragraph desc
-safe_sDog_trips %>%
+NEFOP_sdog_trips %>%
   filter(grepl("GILLNET", HMSGEARCAT),
          DISPDESC == "KEPT") %>%
   group_by(COMNAME) %>%
   summarise(n = n()) %>%
   arrange(desc(n)) %>%
-  kbl() %>%
-  kable_styling() %>% 
-  scroll_box(height = "450px")
-```
+  head()
 
-```{r text10}
 # second paragraph desc
-safe_HMS %>%
+NEFOP_HMS %>%
   filter(grepl("GILLNET", HMSGEARCAT)) %>% 
   select(TARG1_COMMONNAME) %>% 
   table() %>% data.frame() %>% 
-  arrange(desc(Freq)) %>%
-  kbl() %>%
-  kable_styling() %>% 
-  scroll_box(height = "450px")
+  arrange(desc(Freq)) %>% 
+  head()
 
 # drift-sink is NOT sink - is drift
-gill <- safe_HMS %>%
+gill <- NEFOP_HMS %>%
   filter(grepl("GILLNET", HMSGEARCAT),
          !grepl("SHARK|DOGFISH|SKATE", TARG1_COMMONNAME)) %>% #select(TARG1_COMMONNAME) %>% table()
   group_by(HULLNUM1) %>%
@@ -300,24 +300,15 @@ data.frame(N_VESS = nrow(gill),
            N_TRIP = sum(gill$NTRIP),
            N_SETS = sum(gill$NSETS))
 
-gill %>%
-  kbl() %>%
-  kable_styling() %>% 
-  scroll_box(height = "450px")
-
-safe_HMS %>%
+NEFOP_HMS %>%
   filter(grepl("GILLNET", HMSGEARCAT),
          !grepl("SHARK|DOGFISH|SKATE", TARG1_COMMONNAME)) %>%
   group_by(COMNAME) %>%
   summarize(n = n()) %>%
   arrange(desc(n)) %>%
-  kbl() %>%
-  kable_styling() %>% 
-  scroll_box(height = "450px")
-```
+  head()
 
-```{r text11}
-drift <- safe_HMS %>%
+drift <- NEFOP_HMS %>%
   filter(grepl("DRIFT", HMSGEARCAT),
          !grepl("SHARK|DOGFISH|SKATE", TARG1_COMMONNAME)) %>% #select(GEARNM) %>% table()
   group_by(HULLNUM1) %>%
@@ -328,17 +319,16 @@ data.frame(N_VESS = nrow(drift),
            N_TRIP = sum(drift$NTRIP),
            N_SETS = sum(drift$NSETS))
 
-safe_HMS %>%
+NEFOP_HMS %>%
   filter(grepl("DRIFT", HMSGEARCAT),
          !grepl("SHARK|DOGFISH|SKATE", TARG1_COMMONNAME)) %>%
   group_by(COMNAME) %>%
   summarize(n = n()) %>%
-  arrange(desc(n))
-
-
+  arrange(desc(n)) %>%
+  head()
 
 # GOOD  
-sink <- safe_HMS %>%
+sink <- NEFOP_HMS %>%
   filter(grepl("SINK", HMSGEARCAT),
          !grepl("DRIFT-SINK", HMSGEARCAT),
          !grepl("SHARK|DOGFISH|SKATE", TARG1_COMMONNAME),
@@ -351,7 +341,7 @@ data.frame(N_VESS = nrow(sink),
            N_TRIP = sum(sink$NTRIP),
            N_SETS = sum(sink$NSETS))
 
-safe_HMS %>%
+NEFOP_HMS %>%
   filter(grepl("SINK", HMSGEARCAT),
          !grepl("DRIFT-SINK", HMSGEARCAT),
          !grepl("SHARK|DOGFISH|SKATE", TARG1_COMMONNAME),
@@ -359,12 +349,11 @@ safe_HMS %>%
   group_by(COMNAME) %>%
   summarize(n = n()) %>%
   arrange(desc(n))
-```
 
-### Other
-NUM_SETS on NUM_TRIPS targeting sharks but not SMOOTHDOG
-```{r text12}
-safe_HMS %>%
+
+# Misc ----
+#NUM_SETS on NUM_TRIPS targeting sharks but not SMOOTHDOG
+NEFOP_HMS %>%
   filter(grepl("GILLNET", HMSGEARCAT),
          grepl("SHARK|DOGFISH", TARG1_COMMONNAME),
          TARG1_COMMONNAME != "DOGFISH, SMOOTH") %>%
@@ -374,20 +363,18 @@ safe_HMS %>%
             NUM_SETS = length(unique(paste0(TRIPID,HAULNUM))),
             TRP_TARG = paste(unique(TARG1_COMMONNAME), collapse =":"),
             TRP_CTCH = paste(unique(COMNAME), collapse =":")) %>%
-  arrange(VESSELNAME) %>%
-  kbl() %>%
-  kable_styling()
-```
+  arrange(VESSELNAME)  # NUM_ROWS = NUM_VESS
 
-Which targeted species have the most bycatch?
-  ```{r text13, message=F}
-bycatch_speccount <- safe_HMS %>%
+# Which targeted species have the most bycatch?
+# This is a big table, probably want to save/export - gives a view of all HMS
+# and from which target species they were caught as bycatch
+bycatch_speccount <- NEFOP_HMS %>%
   group_by(TARG1_COMMONNAME, COMNAME) %>%
   summarise(NUM_HMSCATCH = n()) %>%
   spread(COMNAME, NUM_HMSCATCH) %>%
   replace(is.na(.), 0)
 
-bycatch_haulcount <- safe_HMS %>%
+bycatch_haulcount <- NEFOP_HMS %>%
   group_by(TARG1_COMMONNAME) %>%
   summarise(TOT.HMS = n(),
             TRIPS = length(unique(TRIPID)),
@@ -399,21 +386,14 @@ NEFOP_HMS_TARG_2023 <- bycatch_haulcount %>%
   arrange(desc(TOT.HMS)) %>% filter(!grepl("SHARK", TARG1_COMMONNAME))
 
 NEFOP_HMS_TARG_2023 %>%
-  rename(TRIP_TARG = TARG1_COMMONNAME) %>%
-  kbl() %>%
-  kable_styling(bootstrap_options = c("striped", "hover")) %>%
-  column_spec(c(1, 5), border_right = T) %>%
-  scroll_box(fixed_thead = TRUE, height = "500px")
+  rename(TRIP_TARG = TARG1_COMMONNAME)
 
-```
 
-## Figures
-### Fig. 6.1
-```{r fig6.1}
+# Figure 6.1* ----
+# Might want to hard-code the export dimensions for the figure
 # Load state and world shapefiles from "maps" package
 state <- map_data("state")
 world <- map_data("world")
-
 # Load shapefiles for closed areas (saved locally, here)
 CB  <- vect("C:/Users/daniel.daye/Documents/DDaye/local_GIS_shapefiles/CBump_a.shp")
 EF  <- vect("C:/Users/daniel.daye/Documents/DDaye/local_GIS_shapefiles/EFC_a.shp")
@@ -482,24 +462,13 @@ fig_6.1 <- ggplot() +
   theme(plot.margin = margin(.5,0,0,0, unit = "cm"),
         panel.grid.minor = element_blank(),
         axis.text = element_text(size = 10, family = "sans"))
-#ggsave("exports/figures/figure_6-1.png", fig_6.1)
-```
+fig_6.1
+ggsave(paste0("./data/",report_year-1,"/figures/fig_6-1.png"), fig_6.1,
+       width = 9, height = 6)
 
-Normally, R Studio plots will automatically size to the plot window. Better to 
-save to an image for the final product but I will make the plotting preview window 
-pretty large to make edits before saving and exporting
-```{r plot6.1, fig.dim=c(9,6)}
-plot(fig_6.1)
 
-```
-
-### Fig. 6.3
-Can also make figures using base R graphics. The original example seemed easy enough 
-to replicate using base R, whereas Fig. 6.1 was a bit more involved and made more 
-sense to recreate via ggplot 
-```{r fig6.3, fig.dim=c(9,7)}
-# Fig. 6.3 ----
-
+# Figure 6.3* ----
+# Update to ggplot syntax
 lims <- data.frame(x = c(-100, -20),
                    y = c(   0,  55))
 basemap <- map_data("world")
@@ -532,8 +501,7 @@ basemap <- map_data("world")
   text(c(73, 65.5, 40,   75.5, 90, 75.5, 65.5, 40, 75, 40, 40)*-1,
        c(38,   40, 40,   32.5, 25,   28,   28, 16, 15,  7,  2),
        adj = 0.5,
-       labels = c("MAB\n(92)", "NEC\n(92)", "NED\n(94)",
-                  "SAB\n(92)",
+       labels = c("MAB\n(92)", "NEC\n(92)", "NED\n(94)", "SAB\n(92)",
                   "GOM\n(91)", "FEC\n(92)", "SAR\n(93)", "NCA\n(93)",
                   "CAR (93)", "TUN (93)", "TUS (96)"))
   segments(x0 = c(65, 71, 78, 82, 82, 87, 60, 52)*-1,
@@ -547,4 +515,3 @@ basemap <- map_data("world")
            y1 = c(22, 35, 22, 45, 8),
            lwd = 2)
   box(which = "plot", lwd = 2)}
-```
